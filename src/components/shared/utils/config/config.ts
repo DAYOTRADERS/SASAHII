@@ -7,7 +7,7 @@ export const APP_IDS = {
     STAGING: 29934,
     STAGING_BE: 29934,
     STAGING_ME: 29934,
-    PRODUCTION: 65555,
+    PRODUCTION: 104022,
     PRODUCTION_BE: 65556,
     PRODUCTION_ME: 65557,
 };
@@ -45,24 +45,7 @@ export const isTestLink = () => {
 export const isLocal = () => /localhost(:\d+)?$/i.test(window.location.hostname);
 
 const getDefaultServerURL = () => {
-    if (isTestLink()) {
-        return 'ws.derivws.com';
-    }
-
-    let active_loginid_from_url;
-    const search = window.location.search;
-    if (search) {
-        const params = new URLSearchParams(document.location.search.substring(1));
-        active_loginid_from_url = params.get('acct1');
-    }
-
-    const loginid = window.localStorage.getItem('active_loginid') ?? active_loginid_from_url;
-    const is_real = loginid && !/^(VRT|VRW)/.test(loginid);
-
-    const server = is_real ? 'green' : 'blue';
-    const server_url = `${server}.derivws.com`;
-
-    return server_url;
+    return 'ws.derivws.com';
 };
 
 export const getDefaultAppIdAndUrl = () => {
@@ -79,30 +62,56 @@ export const getDefaultAppIdAndUrl = () => {
 };
 
 export const getAppId = () => {
-    let app_id = null;
+    const stored_app_id = window.localStorage.getItem('config.app_id');
+    if (stored_app_id && stored_app_id !== '104022') {
+        window.localStorage.removeItem('config.app_id');
+    }
+
     const config_app_id = window.localStorage.getItem('config.app_id');
     const current_domain = getCurrentProductionDomain() ?? '';
 
     if (config_app_id) {
-        app_id = config_app_id;
+        return config_app_id;
     } else if (isStaging()) {
-        app_id = APP_IDS.STAGING;
+        return APP_IDS.STAGING;
     } else if (isTestLink()) {
-        app_id = APP_IDS.LOCALHOST;
+        return APP_IDS.LOCALHOST;
     } else {
-        app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? APP_IDS.PRODUCTION;
+        return domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? APP_IDS.PRODUCTION;
     }
-
-    return app_id;
 };
 
 export const getSocketURL = () => {
-    const local_storage_server_url = window.localStorage.getItem('config.server_url');
-    if (local_storage_server_url) return local_storage_server_url;
+    return 'ws.derivws.com';
+};
 
-    const server_url = getDefaultServerURL();
+export const initializeWebSocket = () => {
+    const app_id = getAppId();
+    const server_url = getSocketURL();
 
-    return server_url;
+    console.log('Initializing WebSocket with:', { app_id, server_url });
+
+    const socket_url = `wss://${server_url}/websockets/v3?app_id=${app_id}&l=EN&brand=deriv`;
+    const socket = new WebSocket(socket_url);
+
+    const connectionTimeout = setTimeout(() => {
+        if (socket.readyState !== WebSocket.OPEN) {
+            socket.close();
+            console.error('WebSocket connection timed out');
+        }
+    }, 10000);
+
+    socket.onopen = () => {
+        clearTimeout(connectionTimeout);
+        console.log('WebSocket connected successfully');
+    };
+
+    socket.onerror = error => {
+        clearTimeout(connectionTimeout);
+        console.error('WebSocket error:', error);
+    };
+
+    return socket;
 };
 
 export const checkAndSetEndpointFromUrl = () => {
@@ -146,35 +155,23 @@ export const generateOAuthURL = () => {
     const { getOauthURL } = URLUtils;
     const oauth_url = getOauthURL();
     const original_url = new URL(oauth_url);
-    const hostname = window.location.hostname;
 
-    // First priority: Check for configured server URLs (for QA/testing environments)
-    const configured_server_url = (LocalStorageUtils.getValue(LocalStorageConstants.configServerURL) ||
-        localStorage.getItem('config.server_url')) as string;
+    const app_id = '104022';
+    localStorage.setItem('config.app_id', app_id);
 
-    const valid_server_urls = ['green.derivws.com', 'red.derivws.com', 'blue.derivws.com', 'canary.derivws.com'];
+    original_url.hostname = 'ws.derivws.com';
 
-    if (
-        configured_server_url &&
-        (typeof configured_server_url === 'string'
-            ? !valid_server_urls.includes(configured_server_url)
-            : !valid_server_urls.includes(JSON.stringify(configured_server_url)))
-    ) {
-        original_url.hostname = configured_server_url;
-    } else if (original_url.hostname.includes('oauth.deriv.')) {
-        // Second priority: Domain-based OAuth URL setting for .me and .be domains
-        if (hostname.includes('.deriv.me')) {
-            original_url.hostname = 'oauth.deriv.me';
-        } else if (hostname.includes('.deriv.be')) {
-            original_url.hostname = 'oauth.deriv.be';
-        } else {
-            // Fallback to original logic for other domains
-            const current_domain = getCurrentProductionDomain();
-            if (current_domain) {
-                const domain_suffix = current_domain.replace(/^[^.]+\./, '');
-                original_url.hostname = `oauth.${domain_suffix}`;
-            }
-        }
-    }
-    return original_url.toString() || oauth_url;
+    original_url.searchParams.set('app_id', app_id);
+
+    return original_url.toString();
 };
+
+if (typeof window !== 'undefined') {
+    if (isLocal() || isTestLink()) {
+        localStorage.removeItem('config.server_url');
+        localStorage.setItem('config.app_id', '104022');
+    }
+
+    checkAndSetEndpointFromUrl();
+    initializeWebSocket();
+}
