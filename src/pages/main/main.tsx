@@ -72,6 +72,7 @@ const AppWrapper = observer(() => {
   const navigate = useNavigate();
   const [left_tab_shadow, setLeftTabShadow] = useState(false);
   const [right_tab_shadow, setRightTabShadow] = useState(false);
+  const [layout, setLayout] = useState('horizontal-split'); // 'horizontal-split' or 'vertical-split'
 
   let tab_value = active_tab;
   const GetHashedValue = (tab) => {
@@ -260,9 +261,28 @@ const AppWrapper = observer(() => {
             'main__container--active': active_tour && active_tab === DASHBOARD && !isDesktop,
           })}
         >
-          <div className="container-wrapper">
+          {/* Layout Controls */}
+          <div className="layout-controls">
+            <button 
+              className={classNames('layout-btn', { active: layout === 'horizontal-split' })}
+              onClick={() => setLayout('horizontal-split')}
+            >
+              <Localize i18n_default_text="Horizontal Split" />
+            </button>
+            <button 
+              className={classNames('layout-btn', { active: layout === 'vertical-split' })}
+              onClick={() => setLayout('vertical-split')}
+            >
+              <Localize i18n_default_text="Vertical Split" />
+            </button>
+          </div>
+
+          <div className={classNames('container-wrapper', layout)}>
             {/* First container: Tabs */}
             <div className="embed-container" aria-label="Tabs container">
+              <div className="container-title">
+                <Localize i18n_default_text="DBot Interface" />
+              </div>
               <div className="tabs-container">
                 <Tabs active_index={active_tab} className="main__tabs" onTabItemClick={handleTabChange} top>
                   <div
@@ -333,6 +353,9 @@ const AppWrapper = observer(() => {
 
             {/* Second container: Embedded site */}
             <div className="embed-container" aria-label="Embedded site container">
+              <div className="container-title">
+                <Localize i18n_default_text="TrackTool Analytics" />
+              </div>
               <iframe
                 src="https://tracktool.netlify.app"
                 title="TrackTool Embedded Site"
