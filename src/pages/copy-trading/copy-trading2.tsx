@@ -521,7 +521,7 @@ const handleAddToken = async () => {
                 <div className='status-bar'>
                   <div className='status-item'>
                     <span className='status-label'>CONNECTION:</span>
-                    <span className='status-value good'>SECURE</span>
+                    <span className='status-value good'>SECURE</span> 
                   </div>
                   <div className='status-item'>
                     <span className='status-label'>LATENCY:</span>
